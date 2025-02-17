@@ -1,0 +1,12 @@
+mkdir myapp
+cd myapp
+mkdir templates static
+touch app.py templates/index.html static/style.css requirements.txt 
+pip install --upgrade webdriver-manager selenium 
+
+# For Ubuntu/Debian
+sudo apt update
+sudo apt install -y chromium-browser
+
+# For CentOS/RHEL
+sudo yum install -y chromium

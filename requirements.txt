@@ -1,0 +1,11 @@
+flask
+beautifulsoup4>=4.9.3
+requests
+pandas
+openpyxl
+selenium
+webdriver_manager
+fake-useragent>=0.1.11
+aiohttp>=3.8.1
+lxml>=4.9.1
+cachetools>=5.3.0 

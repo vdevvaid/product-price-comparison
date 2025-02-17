@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Price Comparison</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Product Price Comparison</h1>
+        
+        <form id="searchForm">
+            <input type="text" id="query" name="query" placeholder="Enter product name..." required>
+            <button type="submit">Search</button>
+        </form>
+
+        <div id="loading" class="loading-spinner hidden">
+            <div class="spinner"></div>
+            <p>Searching products...</p>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <div id="progress" class="hidden">
+            <p>Found <span id="resultCount">0</span> products...</p>
+            <div class="progress-bar"></div>
+        </div>
+
+        <div id="results" class="hidden">
+            <h2>Search Results (<span id="resultCount">0</span> products)</h2>
+            
+            <!-- Filters Section -->
+            <div class="filters">
+                <div class="filter-group">
+                    <label for="sortBy">Sort By:</label>
+                    <select id="sortBy" onchange="applySorting()">
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="name_asc">Name: A to Z</option>
+                        <option value="name_desc">Name: Z to A</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Filter by Merchant:</label>
+                    <div id="merchantFilters" class="merchant-checkboxes">
+                        <!-- Merchants will be added dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <button id="downloadExcel" class="download-btn">Download Excel Report</button>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Price</th>
+                        <th>Source</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentQuery = '';
+        let allProducts = [];
+        let selectedMerchants = new Set();
+
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            currentQuery = document.getElementById('query').value;
+            await performSearch();
+        });
+
+        function applySorting() {
+            const sortBy = document.getElementById('sortBy').value;
+            
+            switch(sortBy) {
+                case 'price_asc':
+                    allProducts.sort((a, b) => a.Price - b.Price);
+                    break;
+                case 'price_desc':
+                    allProducts.sort((a, b) => b.Price - a.Price);
+                    break;
+                case 'name_asc':
+                    allProducts.sort((a, b) => a['Product Name'].localeCompare(b['Product Name']));
+                    break;
+                case 'name_desc':
+                    allProducts.sort((a, b) => b['Product Name'].localeCompare(a['Product Name']));
+                    break;
+            }
+            
+            displayFilteredProducts();
+        }
+
+        function toggleMerchantFilter(merchant) {
+            if (selectedMerchants.has(merchant)) {
+                selectedMerchants.delete(merchant);
+            } else {
+                selectedMerchants.add(merchant);
+            }
+            displayFilteredProducts();
+        }
+
+        function displayFilteredProducts() {
+            const resultsBody = document.getElementById('resultsBody');
+            resultsBody.innerHTML = '';
+            
+            let displayProducts = [...allProducts];
+            
+            // Apply merchant filters if any are selected
+            if (selectedMerchants.size > 0) {
+                displayProducts = displayProducts.filter(product => 
+                    selectedMerchants.has(product.Source)
+                );
+            }
+            
+            displayProducts.forEach(product => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${product['Product Name']}</td>
+                    <td>₹${product['Price'].toLocaleString('en-IN')}</td>
+                    <td>${product['Source']}</td>
+                    <td><a href="${product['URL']}" target="_blank" class="view-btn">View Product</a></td>
+                `;
+                resultsBody.appendChild(row);
+            });
+            
+            document.getElementById('resultCount').textContent = displayProducts.length;
+        }
+
+        function updateMerchantFilters(products) {
+            const priorityOrder = {
+                'Flipkart': 1,
+                'Reliance Digital': 2,
+                'JioMart': 3,
+                'Vijay Sales': 4,
+                'Amazon': 5,
+                'Amazon.in': 5,
+                'Amazon India': 5,
+                'Croma': 6,
+                'Sangeetha Mobiles': 7,
+                'Tata CliQ': 8,
+                'Snapdeal': 9,
+                'Paytm Mall': 10
+            };
+
+            // Get unique merchants
+            const merchants = [...new Set(products.map(p => p.Source))];
+            
+            // Sort merchants by priority
+            merchants.sort((a, b) => {
+                const priorityA = Object.entries(priorityOrder).find(([key]) => 
+                    a.toLowerCase().includes(key.toLowerCase()))?.[1] || 999;
+                const priorityB = Object.entries(priorityOrder).find(([key]) => 
+                    b.toLowerCase().includes(key.toLowerCase()))?.[1] || 999;
+                return priorityA - priorityB;
+            });
+
+            const merchantFilters = document.getElementById('merchantFilters');
+            
+            // Add priority merchants header with updated title
+            merchantFilters.innerHTML = `
+                <div class="merchant-section">
+                    <h3>Best Sellers</h3>
+                    ${merchants.filter(m => 
+                        Object.keys(priorityOrder).some(key => 
+                            m.toLowerCase().includes(key.toLowerCase())
+                        )
+                    ).map(merchant => createMerchantCheckbox(merchant)).join('')}
+                </div>
+                <div class="merchant-section">
+                    <h3>Other Sellers</h3>
+                    ${merchants.filter(m => 
+                        !Object.keys(priorityOrder).some(key => 
+                            m.toLowerCase().includes(key.toLowerCase())
+                        )
+                    ).map(merchant => createMerchantCheckbox(merchant)).join('')}
+                </div>
+            `;
+        }
+
+        function createMerchantCheckbox(merchant) {
+            return `
+                <div class="merchant-checkbox">
+                    <input type="checkbox" 
+                           id="${merchant}" 
+                           value="${merchant}" 
+                           ${selectedMerchants.has(merchant) ? 'checked' : ''}
+                           onchange="toggleMerchantFilter('${merchant}')"
+                    >
+                    <label for="${merchant}">${merchant}</label>
+                </div>
+            `;
+        }
+
+        async function performSearch() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const results = document.getElementById('results');
+            const resultsBody = document.getElementById('resultsBody');
+            const downloadBtn = document.getElementById('downloadExcel');
+            const searchBtn = document.querySelector('button[type="submit"]');
+            const resultCountElements = document.querySelectorAll('#resultCount');
+            
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+            resultsBody.innerHTML = '';
+            searchBtn.disabled = true;
+            
+            try {
+                const formData = new FormData();
+                formData.append('query', currentQuery);
+                
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'An error occurred while searching');
+                }
+                
+                if (!data.products || data.products.length === 0) {
+                    throw new Error('No results found');
+                }
+                
+                allProducts = data.products;
+                selectedMerchants.clear();
+                
+                updateMerchantFilters(allProducts);
+                displayFilteredProducts();
+                
+                resultCountElements.forEach(element => {
+                    element.textContent = data.total_results;
+                });
+                
+                downloadBtn.onclick = () => {
+                    window.location.href = `/download/${encodeURIComponent(data.excel_path)}`;
+                };
+                
+                results.classList.remove('hidden');
+                
+            } catch (err) {
+                error.textContent = err.message || 'An error occurred while searching';
+                error.classList.remove('hidden');
+                resultsBody.innerHTML = '';
+                resultCountElements.forEach(element => {
+                    element.textContent = '0';
+                });
+            } finally {
+                loading.classList.add('hidden');
+                searchBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html> 
