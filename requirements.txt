@@ -1,4 +1,4 @@
-flask
+flask==2.2.2
 beautifulsoup4>=4.9.3
 requests
 pandas
@@ -8,4 +8,5 @@ webdriver_manager
 fake-useragent>=0.1.11
 aiohttp>=3.8.1
 lxml>=4.9.1
-cachetools>=5.3.0 
+cachetools>=5.3.0
+gunicorn==23.0.0
