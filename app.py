@@ -5,18 +5,13 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import chromedriver_autoinstaller
 import pandas as pd
 import tempfile
 import os
 import time
-from urllib.parse import urlencode
 import openpyxl
 from concurrent.futures import ThreadPoolExecutor
-from bs4 import BeautifulSoup
-import asyncio
-import aiohttp
-import random
 from fake_useragent import UserAgent
 from cachetools import TTLCache
 
@@ -25,13 +20,16 @@ app = Flask(__name__)
 class ProductScraper:
     def __init__(self):
         print("Initializing Chrome WebDriver...")
+        
+        # Automatically installs the required chromedriver version if not found
+        chromedriver_autoinstaller.install()
+
         chrome_options = Options()
-        chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--headless')  # Run Chrome in headless mode
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--window-size=1920,1080')
-        # Keep JavaScript enabled for Google Shopping
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')  # Bypass automation detection
         
         self.cache = TTLCache(maxsize=100, ttl=3600)
         
@@ -51,12 +49,10 @@ class ProductScraper:
             'snapdeal': 9,
             'paytm mall': 10
         }
-        
+
         try:
-            self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=chrome_options
-            )
+            # Initialize WebDriver with the automatically installed ChromeDriver
+            self.driver = webdriver.Chrome(options=chrome_options)
             self.driver.set_page_load_timeout(15)
             print("Chrome WebDriver initialized successfully")
         except Exception as e:
@@ -231,4 +227,4 @@ def download(filename):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)
